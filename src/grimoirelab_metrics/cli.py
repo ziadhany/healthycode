@@ -61,6 +61,11 @@ DEFAULT_ELEPHANT_THRESHOLD = 0.5
 )
 @click.option("--grimoirelab-user", help="GrimoireLab API user")
 @click.option("--grimoirelab-password", help="GrimoireLab API password")
+@click.option("--grimoirelab-ecosystem", help="GrimoireLab will classify the data under this ecosystem name")
+@click.option(
+    "--grimoirelab-project", 
+    help="GrimoireLab will classify the data under this project name. Projects are grouped by ecosystem"
+)
 @click.option(
     "--opensearch-url",
     help="OpenSearch URL server",
@@ -110,6 +115,8 @@ def grimoirelab_metrics(
     grimoirelab_url: str,
     grimoirelab_user: str,
     grimoirelab_password: str,
+    grimoirelab_ecosystem: str,
+    grimoirelab_project: str,
     opensearch_url: str,
     opensearch_index: str,
     opensearch_user: str | None = None,
@@ -166,10 +173,12 @@ def grimoirelab_metrics(
             logging.info("Could not find any git repositories to analyze")
             sys.exit(0)
 
-        schedule_repositories(git_urls, grimoirelab_client)
+        schedule_repositories(git_urls, grimoirelab_client, grimoirelab_ecosystem, grimoirelab_project)
 
         metrics = generate_metrics_when_ready(
             grimoirelab_client=grimoirelab_client,
+            grimoirelab_ecosystem=grimoirelab_ecosystem,
+            grimoirelab_project=grimoirelab_project,
             repositories=git_urls,
             opensearch_url=opensearch_url,
             opensearch_index=opensearch_index,
@@ -262,17 +271,25 @@ def get_sbom_packages(file: str) -> dict[str, str]:
     return packages
 
 
-def schedule_repositories(repositories: list[str], grimoirelab_client: GrimoireLabClient) -> None:
+def schedule_repositories(
+    repositories: list[str],
+    grimoirelab_client: GrimoireLabClient,
+    grimoirelab_ecosystem: str,
+    grimoirelab_project: str
+    ) -> None:
     """Schedule tasks to collect data from a list of repositories.
 
     :param repositories: List of git repositories.
     :param grimoirelab_client: GrimoireLab API client.
+    :param grimoirelab_ecosystem: GrimoireLab will classify the data under this ecosystem name.
+    :param grimoirelab_project: GrimoireLab will classify the data under this project name. Projects are grouped by ecosystem.
+
     """
     logging.info("Scheduling data collection tasks with GrimoireLab")
     for package_url in repositories:
         logging.debug(f"Scheduling task to fetch commits from {package_url}")
         try:
-            schedule_repository(grimoirelab_client=grimoirelab_client, uri=package_url, datasource="git", category="commit")
+            schedule_repository(grimoirelab_client, grimoirelab_ecosystem, grimoirelab_project, package_url, "git", "commit")
         except (requests.HTTPError, requests.ConnectionError) as e:
             logging.error(f"Error scheduling task: {e}")
             raise e
@@ -280,6 +297,8 @@ def schedule_repositories(repositories: list[str], grimoirelab_client: GrimoireL
 
 def generate_metrics_when_ready(
     grimoirelab_client: GrimoireLabClient,
+    grimoirelab_ecosystem: str,
+    grimoirelab_project: str,
     repositories: list[str],
     opensearch_url: str,
     opensearch_index: str,
@@ -300,6 +319,8 @@ def generate_metrics_when_ready(
     """Generate metrics once the repositories have finished the collection.
 
     :param grimoirelab_client: GrimoireLab API client.
+    :param grimoirelab_ecosystem: GrimoireLab will classify the data under this ecosystem name
+    :param grimoirelab_project: GrimoireLab will classify the data under this project name. Projects are grouped by ecosystem
     :param repositories: List of repositories.
     :param opensearch_url: OpenSearch URL.
     :param opensearch_index: OpenSearch index.
@@ -327,7 +348,7 @@ def generate_metrics_when_ready(
     while pending_repositories:
         processed = set()
         for repository in pending_repositories:
-            if repository_ready(grimoirelab_client, repository, after_date):
+            if repository_ready(grimoirelab_client, grimoirelab_ecosystem, grimoirelab_project, repository, after_date):
                 metrics["repositories"][repository] = get_repository_metrics(
                     repository=repository,
                     opensearch_url=opensearch_url,
@@ -363,19 +384,23 @@ def generate_metrics_when_ready(
     return metrics
 
 
-def repository_ready(grimoirelab_client: GrimoireLabClient, repository: str, after_date: datetime.datetime) -> bool:
+def repository_ready(
+    grimoirelab_client: GrimoireLabClient,
+    grimoirelab_ecosystem: str,
+    grimoirelab_project: str,
+    repository: str,
+    after_date: datetime.datetime
+    ) -> bool:
     """
     Check if the task related to the repository has finished.
 
     :param grimoirelab_client: GrimoireLab API client.
+    :param grimoirelab_ecosystem: GrimoireLab will classify the data under this ecosystem name
+    :param grimoirelab_project: GrimoireLab will classify the data under this project name. Projects are grouped by ecosystem
     :param repository: Repository URI
     :param after_date: Date to check if the task has finished
     """
-    #FIXME hardcoded parameters
-    ecosystem ="npm-training-set"
-    project = "npm-popular-components"
-
-    endpoint = f"api/v1/ecosystems/{ecosystem}/projects/{project}/repos/"
+    endpoint = f"api/v1/ecosystems/{grimoirelab_ecosystem}/projects/{grimoirelab_project}/repos/"
     try:
         r = grimoirelab_client.get(endpoint, params={"uri": repository})
     except requests.HTTPError as e:
@@ -409,19 +434,26 @@ def is_valid(repository: str) -> bool:
     return repository and not isinstance(repository, SpdxNone) and not isinstance(repository, SpdxNoAssertion)
 
 
-def schedule_repository(grimoirelab_client: GrimoireLabClient, uri: str, datasource: str, category: str) -> Any:
+def schedule_repository(
+    grimoirelab_client: GrimoireLabClient,
+    grimoirelab_ecosystem: str,
+    grimoirelab_project: str,
+    uri: str,
+    datasource: str,
+    category: str
+    ) -> Any:
     """Schedule a task to fetch a Git repository.
 
     :param grimoirelab_client: GrimoireLab API client.
+    :param grimoirelab_ecosystem: GrimoireLab will classify the data under this ecosystem name.
+    :param grimoirelab_project: GrimoireLab will classify the data under this project name. Projects are grouped by ecosystem.
     :param uri: Repository URI.
     :param datasource: Data source type.
     :param category: Data source category.
-    :param ecosystem: Ecosystem name.
-    :param project: Project name.
 
     :return: Scheduled task.
     """
-    #FIXME clarify parameters
+
     data = {
         "uri": uri,
         "datasource_type": datasource,
@@ -433,14 +465,9 @@ def schedule_repository(grimoirelab_client: GrimoireLabClient, uri: str, datasou
         }
     }
 
-    #FIXME hardcoded parameters
-    ecosystem ="npm-training-set"
-    project = "npm-popular-components"
+    if is_added(grimoirelab_client, grimoirelab_ecosystem, grimoirelab_project, uri): return True
 
-
-    if is_added(grimoirelab_client, uri): return True
-
-    endpoint = f"api/v1/ecosystems/{ecosystem}/projects/{project}/repos/"
+    endpoint = f"api/v1/ecosystems/{grimoirelab_ecosystem}/projects/{grimoirelab_project}/repos/"
     try:
         res = grimoirelab_client.post(endpoint, json=data)
         res.raise_for_status()
@@ -454,14 +481,18 @@ def schedule_repository(grimoirelab_client: GrimoireLabClient, uri: str, datasou
             # If it's a different HTTP error (500, 404, 403), re-raise it
             raise e
 
-def is_added(grimoirelab_client: GrimoireLabClient, uri: str) -> bool:
-    """Check if the repository is already scheduled"""
+def is_added(grimoirelab_client: GrimoireLabClient, grimoirelab_ecosystem: str, grimoirelab_project: str, uri: str) -> bool:
+    """Check if the repository is already scheduled
 
-    #FIXME hardcoded parameters
-    ecosystem ="npm-training-set"
-    project = "npm-popular-components"
+    :param grimoirelab_client: GrimoireLab API client.
+    :param grimoirelab_ecosystem: GrimoireLab will classify the data under this ecosystem name.
+    :param grimoirelab_project: GrimoireLab will classify the data under this project name. Projects are grouped by ecosystem.
+    :param uri: Repository URI.
 
-    endpoint = f"api/v1/ecosystems/{ecosystem}/projects/{project}/repos/"
+    :return: Boolean.
+    """
+
+    endpoint = f"api/v1/ecosystems/{grimoirelab_ecosystem}/projects/{grimoirelab_project}/repos/"
     params = {"uri": uri}
 
     try:
