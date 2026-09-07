@@ -25,6 +25,13 @@ from typing import Dict
 
 class npmModel:
 
+    # Ecosystem Name
+    ECOSYSTEM_NAME= "npm"
+    # Model Name
+    MODEL_NAME = "health"
+    # Model Version
+    MODEL_VERSION = "0.1"
+
     # We have dropped the low-impact metrics, those with a coefficient close to 0
     COEFFICIENTS = {
         'elephant_factor': -1.635941,
@@ -73,4 +80,11 @@ class npmModel:
             # FIXME Is this correct?
             probability = 0.0 if z < 0 else 1.0
             
-        return probability
+        return {
+            "value": probability,
+            "metadata": {
+                "ecosystem": self.ECOSYSTEM_NAME,
+                "model": self.MODEL_NAME,
+                "version": self.MODEL_VERSION
+            }
+        }

@@ -205,7 +205,7 @@ def grimoirelab_metrics(
                 package_metrics["packages"][package]["repository"] = repo
                 logging.debug(f"npm Health Score calculated for {repo}")
                 unhealthy_score = npm_metrics_model.calculate_score(metrics["repositories"][repo]["metrics"])
-                package_metrics["packages"][package]["npm_health_score"] = unhealthy_score
+                package_metrics["packages"][package]["score"] = unhealthy_score
             else:
                 package_metrics["packages"][package] = {"metrics": None}
 
