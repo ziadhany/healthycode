@@ -824,7 +824,7 @@ class Distribution(NameVer):
         """
         urls = LinksRepository.from_url(use_cached_index=use_cached_index).links
         errors = []
-        extra_lic_names = [l.get("file") for l in self.extra_data.get("licenses", {})]
+        extra_lic_names = [lic.get("file") for lic in self.extra_data.get("licenses", {})]
         extra_lic_names += [self.extra_data.get("license_file")]
         extra_lic_names = [ln for ln in extra_lic_names if ln]
         lic_names = [f"{key}.LICENSE" for key in self.get_license_keys()]
@@ -846,7 +846,7 @@ class Distribution(NameVer):
                 if TRACE:
                     print(f"Fetched license from remote: {lic_url}")
 
-            except:
+            except Exception:
                 try:
                     # try licensedb second
                     lic_url = f"{LICENSEDB_API_URL}/{filename}"
@@ -859,7 +859,7 @@ class Distribution(NameVer):
                     if TRACE:
                         print(f"Fetched license from licensedb: {lic_url}")
 
-                except:
+                except Exception:
                     msg = f'No text for license {filename} in expression "{self.license_expression}" from {self}'
                     print(msg)
                     errors.append(msg)
@@ -1000,7 +1000,7 @@ def get_license_link_for_filename(filename, urls):
     exception if no link is found or if there are more than one link for that
     file name.
     """
-    path_or_url = [l for l in urls if l.endswith(f"/{filename}")]
+    path_or_url = [url for url in urls if url.endswith(f"/{filename}")]
     if not path_or_url:
         raise Exception(f"Missing link to file: {filename}")
     if not len(path_or_url) == 1:
@@ -1289,7 +1289,7 @@ class Wheel(Distribution):
 def is_pure_wheel(filename):
     try:
         return Wheel.from_filename(filename).is_pure()
-    except:
+    except Exception:
         return False
 
 
@@ -1693,7 +1693,7 @@ class PypiSimpleRepository:
         )
         links = collect_urls(text)
         # TODO: keep sha256
-        links = [l.partition("#sha256=") for l in links]
+        links = [link.partition("#sha256=") for link in links]
         links = [url for url, _, _sha256 in links]
         return links
 
@@ -2198,7 +2198,7 @@ def download_wheels_with_pip(
         cli_args.extend(["--requirement", req_file])
 
     if TRACE:
-        print(f"Downloading wheels using command:", " ".join(cli_args))
+        print("Downloading wheels using command:", " ".join(cli_args))
 
     existing = set(os.listdir(dest_dir))
     error = False
@@ -2282,5 +2282,5 @@ def get_license_expression(declared_licenses):
         return get_only_expression_from_extracted_license(declared_licenses)
     except ImportError:
         # Scancode is not installed, clean and join all the licenses
-        lics = [python_safe_name(l).lower() for l in declared_licenses]
+        lics = [python_safe_name(lic).lower() for lic in declared_licenses]
         return " AND ".join(lics).lower()

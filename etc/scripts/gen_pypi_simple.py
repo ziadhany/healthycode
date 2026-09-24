@@ -204,11 +204,7 @@ def build_pypi_index(directory, base_url="https://thirdparty.aboutcode.org/pypi"
     for pkg_file in directory.iterdir():
         pkg_filename = pkg_file.name
 
-        if (
-            not pkg_file.is_file()
-            or not pkg_filename.endswith(dist_exts)
-            or pkg_filename.startswith(".")
-        ):
+        if (not pkg_file.is_file() or not pkg_filename.endswith(dist_exts) or pkg_filename.startswith(".")):
             continue
 
         pkg_name = get_package_name_from_filename(
