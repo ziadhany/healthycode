@@ -137,8 +137,9 @@ def find_latest_dejacode_package(distribution):
 
     for package_data in packages:
         matched = (
-            package_data["download_url"] == distribution.download_url and
-            package_data["version"] == distribution.version and package_data["filename"] == distribution.filename
+            package_data["download_url"] == distribution.download_url
+            and package_data["version"] == distribution.version
+            and package_data["filename"] == distribution.filename
         )
 
         if matched:

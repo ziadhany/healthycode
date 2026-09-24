@@ -35,8 +35,7 @@ def gen_dev_requirements():
         type=pathlib.Path,
         required=True,
         metavar="DIR",
-        help="Path to the 'site-packages' directory where wheels are installed "
-        "such as lib/python3.12/site-packages",
+        help="Path to the 'site-packages' directory where wheels are installed " "such as lib/python3.12/site-packages",
     )
     parser.add_argument(
         "-d",
@@ -52,8 +51,7 @@ def gen_dev_requirements():
         type=pathlib.Path,
         default="requirements.txt",
         metavar="FILE",
-        help="Path to the main requirements file. Its requirements will be excluded "
-        "from the generated dev requirements.",
+        help="Path to the main requirements file. Its requirements will be excluded " "from the generated dev requirements.",
     )
     args = parser.parse_args()
 

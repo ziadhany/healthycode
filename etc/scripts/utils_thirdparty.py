@@ -252,16 +252,12 @@ def download_wheel(name, version, environment, dest_dir=THIRDPARTY_DIR, repos=tu
         supported_wheels = list(package.get_supported_wheels(environment=environment))
         if not supported_wheels:
             if TRACE_DEEP:
-                print(
-                    f"    download_wheel: No supported wheel for {name}=={version}: {environment} "
-                )
+                print(f"    download_wheel: No supported wheel for {name}=={version}: {environment} ")
             continue
 
         for wheel in supported_wheels:
             if TRACE_DEEP:
-                print(
-                    f"    download_wheel: Getting wheel from index (or cache): {wheel.download_url}"
-                )
+                print(f"    download_wheel: Getting wheel from index (or cache): {wheel.download_url}")
             fetched_wheel_filename = wheel.download(dest_dir=dest_dir)
             fetched_wheel_filenames.append(fetched_wheel_filename)
 
@@ -537,19 +533,14 @@ class Distribution(NameVer):
             package = repo.get_package_version(name=self.name, version=self.version)
             if not package:
                 if TRACE:
-                    print(
-                        f"     get_best_download_url: {self.name}=={self.version} "
-                        f"not found in {repo.index_url}"
-                    )
+                    print(f"     get_best_download_url: {self.name}=={self.version} " f"not found in {repo.index_url}")
                 continue
             pypi_url = package.get_url_for_filename(self.filename)
             if pypi_url:
                 return pypi_url
             else:
                 if TRACE:
-                    print(
-                        f"     get_best_download_url: {self.filename} not found in {repo.index_url}"
-                    )
+                    print(f"     get_best_download_url: {self.filename} not found in {repo.index_url}")
 
     def download(self, dest_dir=THIRDPARTY_DIR):
         """
@@ -908,9 +899,7 @@ class Distribution(NameVer):
 
         classifiers = raw_data.get_all("Classifier") or []
 
-        declared_license = [raw_data["License"]] + [
-            c for c in classifiers if c.startswith("License")
-        ]
+        declared_license = [raw_data["License"]] + [c for c in classifiers if c.startswith("License")]
         license_expression = get_license_expression(declared_license)
         other_classifiers = [c for c in classifiers if not c.startswith("License")]
 
@@ -956,10 +945,7 @@ class Distribution(NameVer):
             purl_from_data = packageurl.PackageURL.from_string(package_url)
             purl_from_self = packageurl.PackageURL.from_string(self.package_url)
             if purl_from_data != purl_from_self:
-                print(
-                    f"Invalid dist update attempt, no same same purl with dist: "
-                    f"{self} using data {data}."
-                )
+                print(f"Invalid dist update attempt, no same same purl with dist: " f"{self} using data {data}.")
                 return
 
         data.pop("about_resource", None)
@@ -1222,9 +1208,7 @@ class Wheel(Distribution):
         platforms = wheel_info.group("plats").split(".")
 
         # All the tag combinations from this file
-        tags = {
-            packaging_tags.Tag(x, y, z) for x in python_versions for y in abis for z in platforms
-        }
+        tags = {packaging_tags.Tag(x, y, z) for x in python_versions for y in abis for z in platforms}
 
         return cls(
             filename=filename,
@@ -1361,18 +1345,14 @@ class PypiPackage(NameVer):
         for dist in dists:
             if dist.normalized_name != normalized_name:
                 if TRACE:
-                    print(
-                        f"  Skipping inconsistent dist name: expected {normalized_name} got {dist}"
-                    )
+                    print(f"  Skipping inconsistent dist name: expected {normalized_name} got {dist}")
                 continue
             elif dist.version != version:
                 dv = packaging_version.parse(dist.version)
                 v = packaging_version.parse(version)
                 if dv != v:
                     if TRACE:
-                        print(
-                            f"  Skipping inconsistent dist version: expected {version} got {dist}"
-                        )
+                        print(f"  Skipping inconsistent dist version: expected {version} got {dist}")
                     continue
 
             if isinstance(dist, Sdist):
@@ -1614,9 +1594,7 @@ class PypiSimpleRepository:
     packages = attr.ib(
         type=dict,
         default=attr.Factory(lambda: defaultdict(dict)),
-        metadata=dict(
-            help="Mapping of {name: {version: PypiPackage, version: PypiPackage, etc} available in this repo"
-        ),
+        metadata=dict(help="Mapping of {name: {version: PypiPackage, version: PypiPackage, etc} available in this repo"),
     )
 
     fetched_package_normalized_names = attr.ib(
@@ -1628,9 +1606,7 @@ class PypiSimpleRepository:
     use_cached_index = attr.ib(
         type=bool,
         default=False,
-        metadata=dict(
-            help="If True, use any existing on-disk cached PyPI index files. Otherwise, fetch and cache."
-        ),
+        metadata=dict(help="If True, use any existing on-disk cached PyPI index files. Otherwise, fetch and cache."),
     )
 
     def _get_package_versions_map(self, name):
@@ -1647,8 +1623,7 @@ class PypiSimpleRepository:
                 links = self.fetch_links(normalized_name=normalized_name)
                 # note that thsi is sorted so the mapping is also sorted
                 versions = {
-                    package.version: package
-                    for package in PypiPackage.packages_from_many_paths_or_urls(paths_or_urls=links)
+                    package.version: package for package in PypiPackage.packages_from_many_paths_or_urls(paths_or_urls=links)
                 }
                 self.packages[normalized_name] = versions
             except RemoteNotFetchedException as e:
@@ -1726,9 +1701,7 @@ class LinksRepository:
     use_cached_index = attr.ib(
         type=bool,
         default=False,
-        metadata=dict(
-            help="If True, use any existing on-disk cached index files. Otherwise, fetch and cache."
-        ),
+        metadata=dict(help="If True, use any existing on-disk cached index files. Otherwise, fetch and cache."),
     )
 
     def __attrs_post_init__(self):
@@ -1746,9 +1719,7 @@ class LinksRepository:
         if TRACE_DEEP:
             print(f"Finding links from: {links_url}")
         plinks_url = urllib.parse.urlparse(links_url)
-        base_url = urllib.parse.SplitResult(
-            plinks_url.scheme, plinks_url.netloc, "", "", ""
-        ).geturl()
+        base_url = urllib.parse.SplitResult(plinks_url.scheme, plinks_url.netloc, "", "", "").geturl()
 
         if TRACE_DEEP:
             print(f"Base URL {base_url}")
@@ -1866,9 +1837,7 @@ def get_file_content(path_or_url, as_text=True):
         _headers, content = get_remote_file_content(url=path_or_url, as_text=as_text)
         return content
 
-    elif path_or_url.startswith("file://") or (
-        path_or_url.startswith("/") and os.path.exists(path_or_url)
-    ):
+    elif path_or_url.startswith("file://") or (path_or_url.startswith("/") and os.path.exists(path_or_url)):
         return get_local_file_content(path=path_or_url, as_text=as_text)
 
     else:
@@ -2036,11 +2005,7 @@ def fetch_abouts_and_licenses(dest_dir=THIRDPARTY_DIR, use_cached_index=False):
                 continue
 
             # try to get another version of the same package that is not our version
-            other_local_packages = [
-                p
-                for p in packages_by_name[local_package.name]
-                if p.version != local_package.version
-            ]
+            other_local_packages = [p for p in packages_by_name[local_package.name] if p.version != local_package.version]
             other_local_version = other_local_packages and other_local_packages[-1]
             if other_local_version:
                 latest_local_dists = list(other_local_version.get_distributions())
@@ -2058,9 +2023,7 @@ def fetch_abouts_and_licenses(dest_dir=THIRDPARTY_DIR, use_cached_index=False):
                 # if has key data we may look to improve later, but we can move on
                 if local_dist.has_key_metadata():
                     local_dist.save_about_and_notice_files(dest_dir=dest_dir)
-                    local_dist.fetch_license_files(
-                        dest_dir=dest_dir, use_cached_index=use_cached_index
-                    )
+                    local_dist.fetch_license_files(dest_dir=dest_dir, use_cached_index=use_cached_index)
                     continue
 
             # lets try to fetch remotely
@@ -2077,9 +2040,7 @@ def fetch_abouts_and_licenses(dest_dir=THIRDPARTY_DIR, use_cached_index=False):
             lpv = local_package.version
             lpn = local_package.name
 
-            other_remote_packages = [
-                p for v, p in PYPI_SELFHOSTED_REPO.get_package_versions(lpn).items() if v != lpv
-            ]
+            other_remote_packages = [p for v, p in PYPI_SELFHOSTED_REPO.get_package_versions(lpn).items() if v != lpv]
 
             latest_version = other_remote_packages and other_remote_packages[-1]
             if latest_version:
@@ -2098,9 +2059,7 @@ def fetch_abouts_and_licenses(dest_dir=THIRDPARTY_DIR, use_cached_index=False):
                 # if has key data we may look to improve later, but we can move on
                 if local_dist.has_key_metadata():
                     local_dist.save_about_and_notice_files(dest_dir=dest_dir)
-                    local_dist.fetch_license_files(
-                        dest_dir=dest_dir, use_cached_index=use_cached_index
-                    )
+                    local_dist.fetch_license_files(dest_dir=dest_dir, use_cached_index=use_cached_index)
                     continue
 
             # try to get data from pkginfo (no license though)
@@ -2133,9 +2092,7 @@ def call(args, verbose=TRACE):
     """
     if TRACE_DEEP:
         print("Calling:", " ".join(args))
-    with subprocess.Popen(
-        args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8"
-    ) as process:
+    with subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8") as process:
         stdouts = []
         while True:
             line = process.stdout.readline()

@@ -168,10 +168,7 @@ class Package(NamedTuple):
         )
 
     def simple_index_entry(self, base_url):
-        return (
-            f'    <a href="{base_url}/{self.archive_file.name}#sha256={self.checksum}">'
-            f"{self.archive_file.name}</a><br/>"
-        )
+        return f'    <a href="{base_url}/{self.archive_file.name}#sha256={self.checksum}">' f"{self.archive_file.name}</a><br/>"
 
 
 def build_pypi_index(directory, base_url="https://thirdparty.aboutcode.org/pypi"):
@@ -204,7 +201,7 @@ def build_pypi_index(directory, base_url="https://thirdparty.aboutcode.org/pypi"
     for pkg_file in directory.iterdir():
         pkg_filename = pkg_file.name
 
-        if (not pkg_file.is_file() or not pkg_filename.endswith(dist_exts) or pkg_filename.startswith(".")):
+        if not pkg_file.is_file() or not pkg_filename.endswith(dist_exts) or pkg_filename.startswith("."):
             continue
 
         pkg_name = get_package_name_from_filename(

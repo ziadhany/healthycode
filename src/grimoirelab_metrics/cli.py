@@ -61,8 +61,9 @@ DEFAULT_ELEPHANT_THRESHOLD = 0.5
 @click.option("--grimoirelab-user", help="GrimoireLab API user")
 @click.option("--grimoirelab-password", help="GrimoireLab API password")
 @click.option("--grimoirelab-ecosystem", help="GrimoireLab will classify the data under this ecosystem name")
-@click.option("--grimoirelab-project",
-    help="GrimoireLab will classify the data under this project name. Projects are grouped by ecosystem")
+@click.option(
+    "--grimoirelab-project", help="GrimoireLab will classify the data under this project name. Projects are grouped by ecosystem"
+)
 @click.option(
     "--opensearch-url",
     help="OpenSearch URL server",
@@ -221,7 +222,7 @@ def grimoirelab_metrics(
             "dev_categories_thresholds": dev_categories_thresholds,
         }
         output.write(json.dumps(package_metrics, indent=4))
-        logging.info(f"Metrics and scores are calculated and written to file \"{output.name}\"")
+        logging.info(f'Metrics and scores are calculated and written to file "{output.name}"')
     except SPDXParsingError as e:
         logging.error(e.messages[0])
         sys.exit(1)
@@ -272,10 +273,7 @@ def get_sbom_packages(file: str) -> dict[str, str]:
 
 
 def schedule_repositories(
-        repositories: list[str],
-        grimoirelab_client: GrimoireLabClient,
-        grimoirelab_ecosystem: str,
-        grimoirelab_project: str
+    repositories: list[str], grimoirelab_client: GrimoireLabClient, grimoirelab_ecosystem: str, grimoirelab_project: str
 ) -> None:
     """Schedule tasks to collect data from a list of repositories.
 
@@ -389,7 +387,7 @@ def repository_ready(
     grimoirelab_ecosystem: str,
     grimoirelab_project: str,
     repository: str,
-    after_date: datetime.datetime
+    after_date: datetime.datetime,
 ) -> bool:
     """
     Check if the task related to the repository has finished.
@@ -439,7 +437,7 @@ def schedule_repository(
     grimoirelab_project: str,
     uri: str,
     datasource: str,
-    category: str
+    category: str,
 ) -> Any:
     """Schedule a task to fetch a Git repository.
 
@@ -457,11 +455,7 @@ def schedule_repository(
         "uri": uri,
         "datasource_type": datasource,
         "category": category,
-        "scheduler": {
-            "job_interval": 86400,
-            "job_max_retries": 3,
-            "force_run": False
-        }
+        "scheduler": {"job_interval": 86400, "job_max_retries": 3, "force_run": False},
     }
 
     if is_added(grimoirelab_client, grimoirelab_ecosystem, grimoirelab_project, uri):

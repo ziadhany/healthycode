@@ -1,4 +1,4 @@
 [flake8]
 exclude = .git, .eggs, __pycache__, build, dist, docs, docker, migrations
-ignore = E129, E402, F841, W504 E128 
+ignore = E129, E402, F841, W504 E128 , W503, E203
 max-line-length = 130

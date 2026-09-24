@@ -87,9 +87,7 @@ def update_skeleton_files(repo_names=ABOUTCODE_PUBLIC_REPO_NAMES):
         os.chdir(work_dir_path / repo_name)
 
         # Add skeleton as an origin
-        subprocess.run(
-            ["git", "remote", "add", "skeleton", "git@github.com:aboutcode-org/skeleton.git"]
-        )
+        subprocess.run(["git", "remote", "add", "skeleton", "git@github.com:aboutcode-org/skeleton.git"])
 
         # Fetch skeleton files
         subprocess.run(["git", "fetch", "skeleton"])

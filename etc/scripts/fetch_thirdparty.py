@@ -57,8 +57,7 @@ TRACE_DEEP = False
     metavar="DIR",
     default=utils_thirdparty.THIRDPARTY_DIR,
     show_default=True,
-    help="Path to the detsination directory where to save downloaded wheels, "
-    "sources, ABOUT and LICENSE files..",
+    help="Path to the detsination directory where to save downloaded wheels, " "sources, ABOUT and LICENSE files..",
 )
 @click.option(
     "-w",
@@ -107,8 +106,7 @@ TRACE_DEEP = False
 @click.option(
     "--use-cached-index",
     is_flag=True,
-    help="Use on disk cached PyPI indexes list of packages and versions and "
-    "do not refetch if present.",
+    help="Use on disk cached PyPI indexes list of packages and versions and " "do not refetch if present.",
 )
 @click.option(
     "--sdist-only",
@@ -186,8 +184,7 @@ def fetch_thirdparty(
     print(f"COLLECTING REQUIRED NAMES & VERSIONS FROM {dest_dir}")
 
     existing_packages_by_nv = {
-        (package.name, package.version): package
-        for package in utils_thirdparty.get_local_packages(directory=dest_dir)
+        (package.name, package.version): package for package in utils_thirdparty.get_local_packages(directory=dest_dir)
     }
 
     required_name_versions = set(existing_packages_by_nv.keys())
