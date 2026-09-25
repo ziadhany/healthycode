@@ -84,8 +84,8 @@ class EndToEndTestCase(unittest.TestCase):
     def _start_grimoirelab(self):
         env = os.environ
         env["DJANGO_SETTINGS_MODULE"] = "grimoirelab.core.config.settings"
-        env["GRIMOIRELAB_REDIS_PORT"] = self.redis_container.get_exposed_port(6379)
-        env["GRIMOIRELAB_DB_PORT"] = self.mysql_container.get_exposed_port(3306)
+        env["GRIMOIRELAB_REDIS_PORT"] = str(self.redis_container.get_exposed_port(6379))
+        env["GRIMOIRELAB_DB_PORT"] = str(self.mysql_container.get_exposed_port(3306))
         env["GRIMOIRELAB_DB_PASSWORD"] = self.mysql_container.root_password
         env["GRIMOIRELAB_ARCHIVIST_STORAGE_URL"] = self.opensearch_url
         env["GRIMOIRELAB_USER_PASSWORD"] = "admin"

@@ -22,10 +22,7 @@ import logging
 import os
 import tempfile
 import unittest
-
 import httpretty
-import requests
-
 from unittest.mock import patch
 
 from click.testing import CliRunner
@@ -33,95 +30,151 @@ from grimoirelab_metrics.cli import grimoirelab_metrics, get_repository
 
 
 GRIMOIRELAB_URL = "http://localhost:8000"
-OPENSEARCH_URL = "https://admin:admin@localhost:9200"
+GRIMOIRELAB_USER = "admin"
+GRIMOIRELAB_PASSWORD = "admin"
+GRIMOIRELAB_ECOSYSTEM = "npm-training-set"
+GRIMOIRELAB_PROJECT = "npm-popular-components"
+
+OPENSEARCH_URL = "https://localhost:9200"
+OPENSEARCH_USER = "admin"
+OPENSEARCH_PASSWORD = "admin"
 OPENSEARCH_INDEX = "events"
 
-TASK_URL = f"{GRIMOIRELAB_URL}/datasources/add_repository"
-REPOSITORIES_URL = f"{GRIMOIRELAB_URL}/datasources/repositories/"
+ERROR_GRIMOIRELAB_URL = "http://localhost:8001"
+
+REPOSITORIES_URL = f"{GRIMOIRELAB_URL}/api/v1/ecosystems/{GRIMOIRELAB_ECOSYSTEM}" f"/projects/{GRIMOIRELAB_PROJECT}/repos/"
+ERROR_REPOSITORIES_URL = (
+    f"{ERROR_GRIMOIRELAB_URL}/api/v1/ecosystems/{GRIMOIRELAB_ECOSYSTEM}" f"/projects/{GRIMOIRELAB_PROJECT}/repos/"
+)
 
 
-def setup_add_repository_mock_server():
-    """Set up a mock HTTP server for API calls"""
+def command_args(source, output_path, *extra, grimoirelab_url=GRIMOIRELAB_URL):
+    """Build the invocation exactly like collect_and_store_grimoire_metric()"""
+    return [
+        source,
+        "--grimoirelab-url",
+        grimoirelab_url,
+        "--grimoirelab-user",
+        GRIMOIRELAB_USER,
+        "--grimoirelab-password",
+        GRIMOIRELAB_PASSWORD,
+        "--grimoirelab-ecosystem",
+        GRIMOIRELAB_ECOSYSTEM,
+        "--grimoirelab-project",
+        GRIMOIRELAB_PROJECT,
+        "--opensearch-url",
+        OPENSEARCH_URL,
+        "--opensearch-index",
+        OPENSEARCH_INDEX,
+        "--opensearch-user",
+        OPENSEARCH_USER,
+        "--opensearch-password",
+        OPENSEARCH_PASSWORD,
+        "--output",
+        output_path,
+        *extra,
+    ]
 
-    http_requests = []
 
-    def request_callback(request, uri, headers):
-        last_request = httpretty.last_request()
-        http_requests.append(last_request)
-        data = {"message": "Task scheduled correctly"}
-        body = json.dumps(data)
+def register_auth_endpoint(base_url):
+    """Mock authenticate endpoint"""
 
+    def token_callback(request, uri, headers):
+        body = json.dumps({"token": "fake-token", "access": "fake-token", "access_token": "fake-token"})
         return (200, headers, body)
 
-    def exception_callback(request, uri, headers):
-        last_request = httpretty.last_request()
-        http_requests.append(last_request)
-
-        raise requests.ConnectionError()
-
-    httpretty.register_uri(httpretty.POST, TASK_URL, responses=[httpretty.Response(body=request_callback)])
     httpretty.register_uri(
         httpretty.POST,
-        "http://localhost:8001/datasources/add_repository",
-        responses=[httpretty.Response(body=exception_callback)],
+        f"{base_url}/token/",
+        responses=[httpretty.Response(body=token_callback)],
     )
 
-    return http_requests
+
+def repository_data(uri, status, last_run):
+    """Build the repositories payload returned by endpoint"""
+
+    return {
+        "count": 1,
+        "results": [
+            {
+                "uri": uri,
+                "categories": [{"task": {"last_run": last_run, "status": status}}],
+            }
+        ],
+    }
 
 
-def setup_get_repositories_mock_server():
-    """Setup a mock HTTP server for repository API calls"""
+def setup_grimoirelab_mock_server(never_ending=False):
+    """Set up a GrimoireLab API mock used by the CLI."""
+    register_auth_endpoint(GRIMOIRELAB_URL)
 
-    http_requests = []
+    post_requests = []
+    get_requests = []
+    scheduled = set()
 
-    def request_callback(request, uri, headers):
-        last_request = httpretty.last_request()
-        http_requests.append(last_request)
-        data = {
-            "results": [
-                {
-                    "task": {
-                        "last_run": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
-                        "status": "completed",
-                    }
-                }
-            ]
-        }
-        body = json.dumps(data)
+    def get_callback(request, uri, headers):
+        get_requests.append(request)
+        repo_uri = request.querystring.get("uri", [None])[0]
 
-        return 200, headers, body
+        if repo_uri not in scheduled:
+            data = {"count": 0, "results": []}
+        elif never_ending:
+            last_run = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=365)
+            data = repository_data(repo_uri, "running", last_run.isoformat())
+        else:
+            last_run = datetime.datetime.now(datetime.timezone.utc)
+            data = repository_data(repo_uri, "completed", last_run.isoformat())
 
-    httpretty.register_uri(httpretty.GET, REPOSITORIES_URL, responses=[httpretty.Response(body=request_callback)])
+        return (200, headers, json.dumps(data))
 
-    return http_requests
+    def post_callback(request, uri, headers):
+        try:
+            repo_uri = json.loads(request.body)["uri"]
+        except (ValueError, KeyError):
+            repo_uri = None
+
+        if repo_uri and repo_uri not in scheduled:
+            scheduled.add(repo_uri)
+            post_requests.append(request)
+
+        return (200, headers, json.dumps({"message": "Task scheduled correctly"}))
+
+    httpretty.register_uri(
+        httpretty.GET,
+        REPOSITORIES_URL,
+        responses=[httpretty.Response(body=get_callback)],
+    )
+    httpretty.register_uri(
+        httpretty.POST,
+        REPOSITORIES_URL,
+        responses=[httpretty.Response(body=post_callback)],
+    )
+
+    return post_requests, get_requests
 
 
-def setup_get_never_ending_repositories_mock_server():
-    """Setup a mock HTTP server for repository API calls"""
+def setup_grimoirelab_error_mock_server():
+    """Set up a mock server whose repositories API always returns 500"""
 
-    http_requests = []
+    register_auth_endpoint(ERROR_GRIMOIRELAB_URL)
 
-    def request_callback(request, uri, headers):
-        last_request = httpretty.last_request()
-        http_requests.append(last_request)
-        last_run = datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=365)
-        data = {
-            "results": [
-                {
-                    "task": {
-                        "last_run": last_run.isoformat(),
-                        "status": "running",
-                    }
-                }
-            ]
-        }
-        body = json.dumps(data)
+    post_requests = []
 
-        return 200, headers, body
+    def error_callback(request, uri, headers):
+        return (500, headers, json.dumps({"detail": "internal server error"}))
 
-    httpretty.register_uri(httpretty.GET, REPOSITORIES_URL, responses=[httpretty.Response(body=request_callback)])
+    httpretty.register_uri(
+        httpretty.GET,
+        ERROR_REPOSITORIES_URL,
+        responses=[httpretty.Response(body=error_callback)],
+    )
+    httpretty.register_uri(
+        httpretty.POST,
+        ERROR_REPOSITORIES_URL,
+        responses=[httpretty.Response(body=error_callback)],
+    )
 
-    return http_requests
+    return post_requests
 
 
 class TestCli(unittest.TestCase):
@@ -138,32 +191,19 @@ class TestCli(unittest.TestCase):
     def test_valid_file(self, mock_get_repository_metrics):
         """Check if it schedules tasks to analyze all git repositories from a valid file"""
 
-        http_requests = setup_add_repository_mock_server()
-        http_requests_repos = setup_get_repositories_mock_server()
+        httpretty.allow_net_connect = False
+        http_requests, http_requests_repos = setup_grimoirelab_mock_server()
         mock_get_repository_metrics.return_value = {"metrics": {"num_commits": 10}}
 
         runner = CliRunner()
-        result = runner.invoke(
-            grimoirelab_metrics,
-            [
-                "./data/valid.spdx.xml",
-                "--grimoirelab-url",
-                GRIMOIRELAB_URL,
-                "--opensearch-url",
-                OPENSEARCH_URL,
-                "--opensearch-index",
-                OPENSEARCH_INDEX,
-                "--output",
-                self.temp_file.name,
-            ],
-        )
+        result = runner.invoke(grimoirelab_metrics, command_args("./data/valid.spdx.xml", self.temp_file.name))
 
         self.assertEqual(result.exit_code, 0)
         self.assertIn("Found 5 git repositories", result.output)
-        self.assertIn("Scheduling tasks", result.output)
+        self.assertIn("Scheduling data collection tasks", result.output)
         self.assertNotIn("Scheduling task to fetch commits", result.output)
         self.assertEqual(len(http_requests), 5)
-        self.assertEqual(len(http_requests_repos), 5)
+        self.assertEqual(len(http_requests_repos), 10)
 
         expected_packages = [
             "SPDXRef-bootstrap-gnu-config.bst-0",
@@ -186,231 +226,138 @@ class TestCli(unittest.TestCase):
     def test_verbose(self, mock_get_repository_metrics):
         """Check if it logs all information when using '--verbose'"""
 
-        http_requests = setup_add_repository_mock_server()
-        http_requests_repos = setup_get_repositories_mock_server()
+        httpretty.allow_net_connect = False
+        http_requests, http_requests_repos = setup_grimoirelab_mock_server()
         mock_get_repository_metrics.return_value = {"metrics": {"num_commits": 10}}
 
         runner = CliRunner()
-        result = runner.invoke(
-            grimoirelab_metrics,
-            [
-                "./data/valid.spdx.xml",
-                "--grimoirelab-url",
-                GRIMOIRELAB_URL,
-                "--opensearch-url",
-                OPENSEARCH_URL,
-                "--opensearch-index",
-                OPENSEARCH_INDEX,
-                "--output",
-                self.temp_file.name,
-                "--verbose",
-            ],
-        )
+        result = runner.invoke(grimoirelab_metrics, command_args("./data/valid.spdx.xml", self.temp_file.name, "--verbose"))
 
         self.assertEqual(result.exit_code, 0)
         self.assertIn("Found 5 git repositories", result.output)
-        self.assertIn("Scheduling tasks", result.output)
+        self.assertIn("Scheduling data collection tasks", result.output)
         self.assertIn("Scheduling task to fetch commits", result.output)
         self.assertEqual(len(http_requests), 5)
-        self.assertEqual(len(http_requests_repos), 5)
+        self.assertEqual(len(http_requests_repos), 10)
 
     @httpretty.activate
     def test_invalid_file_type(self):
         """Check if it returns an error when the file type is not valid"""
 
-        http_requests = setup_add_repository_mock_server()
-        runner = CliRunner()
-        result = runner.invoke(
-            grimoirelab_metrics,
-            [
-                "invalid.doc",
-                "--grimoirelab-url",
-                GRIMOIRELAB_URL,
-                "--opensearch-url",
-                OPENSEARCH_URL,
-                "--opensearch-index",
-                OPENSEARCH_INDEX,
-                "--output",
-                self.temp_file.name,
-            ],
-        )
+        httpretty.allow_net_connect = False
+        http_requests, http_requests_repos = setup_grimoirelab_mock_server()
 
-        self.assertEqual(result.exit_code, 1)
-        self.assertIn("Unsupported SPDX file type", result.output)
+        runner = CliRunner()
+        result = runner.invoke(grimoirelab_metrics, command_args("invalid.doc", self.temp_file.name))
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("The source is not a file and does not end with .git", result.output)
         self.assertEqual(len(http_requests), 0)
+        self.assertEqual(len(http_requests_repos), 0)
 
     @httpretty.activate
     def test_invalid_sbom_format(self):
         """Check if it returns an error when the SBoM is not formatted correctly"""
 
-        http_requests = setup_add_repository_mock_server()
+        httpretty.allow_net_connect = False
+        http_requests, http_requests_repos = setup_grimoirelab_mock_server()
+
         runner = CliRunner()
-        result = runner.invoke(
-            grimoirelab_metrics,
-            [
-                "./data/invalid_format.spdx.json",
-                "--grimoirelab-url",
-                GRIMOIRELAB_URL,
-                "--opensearch-url",
-                OPENSEARCH_URL,
-                "--opensearch-index",
-                OPENSEARCH_INDEX,
-                "--output",
-                self.temp_file.name,
-            ],
-        )
+        result = runner.invoke(grimoirelab_metrics, command_args("./data/invalid_format.spdx.json", self.temp_file.name))
 
         self.assertEqual(result.exit_code, 1)
         self.assertIn("Error while parsing document", result.output)
         self.assertEqual(len(http_requests), 0)
+        self.assertEqual(len(http_requests_repos), 0)
 
     @httpretty.activate
     @patch("grimoirelab_metrics.cli.get_repository_metrics")
     def test_no_repository(self, mock_get_repository_metrics):
         """Check if it returns a warning when a package does not provide a git repository"""
 
-        http_requests = setup_add_repository_mock_server()
-        http_requests_repos = setup_get_repositories_mock_server()
+        httpretty.allow_net_connect = False
+        http_requests, http_requests_repos = setup_grimoirelab_mock_server()
         mock_get_repository_metrics.return_value = {"metrics": {"num_commits": 10}}
 
         runner = CliRunner()
-        result = runner.invoke(
-            grimoirelab_metrics,
-            [
-                "./data/missing_repo.spdx.xml",
-                "--grimoirelab-url",
-                GRIMOIRELAB_URL,
-                "--opensearch-url",
-                OPENSEARCH_URL,
-                "--opensearch-index",
-                OPENSEARCH_INDEX,
-                "--output",
-                self.temp_file.name,
-            ],
-        )
-
+        result = runner.invoke(grimoirelab_metrics, command_args("./data/missing_repo.spdx.xml", self.temp_file.name))
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
             "Could not find a git repository for SPDXRef-bootstrap-gnu-config.bst-0 (bootstrap/gnu-config.bst)",
             result.output,
         )
-        self.assertEqual(len(http_requests), 4)
 
     @httpretty.activate
     @patch("grimoirelab_metrics.cli.get_repository_metrics")
     def test_invalid_git_repository(self, mock_get_repository_metrics):
         """Check if it returns a warning when a package URI is not a valid git repository"""
 
-        http_requests = setup_add_repository_mock_server()
-        http_requests_repos = setup_get_repositories_mock_server()
+        httpretty.allow_net_connect = False
+        http_requests, http_requests_repos = setup_grimoirelab_mock_server()
         mock_get_repository_metrics.return_value = {"metrics": {"num_commits": 10}}
 
         runner = CliRunner()
-        result = runner.invoke(
-            grimoirelab_metrics,
-            [
-                "./data/invalid_repo.spdx.xml",
-                "--grimoirelab-url",
-                GRIMOIRELAB_URL,
-                "--opensearch-url",
-                OPENSEARCH_URL,
-                "--opensearch-index",
-                OPENSEARCH_INDEX,
-                "--output",
-                self.temp_file.name,
-            ],
-        )
-
+        result = runner.invoke(grimoirelab_metrics, command_args("./data/invalid_repo.spdx.xml", self.temp_file.name))
         self.assertEqual(result.exit_code, 0)
         self.assertIn("Could not find a git repository for SPDXRef-ncurses-6.40 (bootstrap/ncurses.bst)", result.output)
-        self.assertEqual(len(http_requests), 4)
-        self.assertEqual(len(http_requests_repos), 4)
 
     @httpretty.activate
     def test_no_file(self):
         """Check if it returns an error when the file does not exist"""
 
-        http_requests = setup_add_repository_mock_server()
-        runner = CliRunner()
-        result = runner.invoke(
-            grimoirelab_metrics,
-            [
-                "./data/no_file.xml",
-                "--grimoirelab-url",
-                GRIMOIRELAB_URL,
-                "--opensearch-url",
-                OPENSEARCH_URL,
-                "--opensearch-index",
-                OPENSEARCH_INDEX,
-                "--output",
-                self.temp_file.name,
-            ],
-        )
+        httpretty.allow_net_connect = False
+        http_requests, http_requests_repos = setup_grimoirelab_mock_server()
 
-        self.assertEqual(result.exit_code, 1)
-        self.assertIn("No such file or directory", result.output)
+        runner = CliRunner()
+        result = runner.invoke(grimoirelab_metrics, command_args("./data/no_file.xml", self.temp_file.name))
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("The source is not a file and does not end with .git", result.output)
         self.assertEqual(len(http_requests), 0)
+        self.assertEqual(len(http_requests_repos), 0)
 
     @httpretty.activate
-    def test_server_error(self):
+    @patch("grimoirelab_metrics.grimoirelab_client.time.sleep")
+    def test_server_error(self, mock_sleep):
         """Check if it returns a warning when there is a server error"""
-
-        http_requests = setup_add_repository_mock_server()
+        httpretty.allow_net_connect = False
+        http_requests = setup_grimoirelab_error_mock_server()
         runner = CliRunner()
         result = runner.invoke(
             grimoirelab_metrics,
-            [
-                "./data/valid.spdx.xml",
-                "--grimoirelab-url",
-                "http://localhost:8001",
-                "--opensearch-url",
-                OPENSEARCH_URL,
-                "--opensearch-index",
-                OPENSEARCH_INDEX,
-                "--output",
-                self.temp_file.name,
-            ],
+            command_args("./data/valid.spdx.xml", self.temp_file.name, grimoirelab_url=ERROR_GRIMOIRELAB_URL),
         )
 
         self.assertEqual(result.exit_code, 1)
         self.assertIn("Error scheduling task", result.output)
-        self.assertEqual(len(http_requests), 5)
+        self.assertEqual(len(http_requests), 0)
 
     @httpretty.activate
     @patch("grimoirelab_metrics.cli.get_repository_metrics")
     def test_never_ending_repository(self, mock_get_repository_metrics):
         """Check if it returns a warning when a repository task never ends"""
 
-        http_requests = setup_add_repository_mock_server()
-        http_requests_repos = setup_get_never_ending_repositories_mock_server()
+        httpretty.allow_net_connect = False
+        http_requests, http_requests_repos = setup_grimoirelab_mock_server(never_ending=True)
         mock_get_repository_metrics.return_value = {"metrics": {"num_commits": 10}}
 
         runner = CliRunner()
 
         result = runner.invoke(
             grimoirelab_metrics,
-            [
-                "./data/valid.spdx.xml",
-                "--grimoirelab-url",
-                GRIMOIRELAB_URL,
-                "--opensearch-url",
-                OPENSEARCH_URL,
-                "--opensearch-index",
-                OPENSEARCH_INDEX,
-                "--output",
-                self.temp_file.name,
-                "--repository-timeout",
-                15,
-            ],
+            command_args("./data/valid.spdx.xml", self.temp_file.name, "--repository-timeout", "0"),
         )
 
         self.assertEqual(result.exit_code, 0)
-        self.assertIn(
-            "Timeout waiting for repository https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux to be ready",
-            result.output,
-        )
+        self.assertIn("Timeout waiting for repository", result.output)
         self.assertEqual(len(http_requests), 5)
         self.assertEqual(len(http_requests_repos), 10)
+
+        with open(self.temp_file.name) as f:
+            metrics = json.load(f)
+        self.assertEqual(len(metrics["packages"]), 5)
+        for data in metrics["packages"].values():
+            self.assertIsNone(data["metrics"])
 
 
 class TestGetRepository(unittest.TestCase):
@@ -429,7 +376,7 @@ class TestGetRepository(unittest.TestCase):
         for uri in valid_git_uris:
             with self.subTest(uri=uri):
                 result = get_repository(uri)
-                self.assertEqual(result, "https://git.myproject.org/MyProject")
+                self.assertEqual(result, "https://git.myproject.org/MyProject.git")
 
     def test_invalid_git_repository(self):
         invalid_git_uris = [
