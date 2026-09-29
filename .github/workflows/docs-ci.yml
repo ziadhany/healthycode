@@ -23,8 +23,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "PATH=$HOME/.poetry/bin:$PATH" >> $GITHUB_ENV
+
       - name: Install Dependencies
-        run:  ./configure --dev
+        run:  poetry install --with docs
 
       - name: Check documentation and HTML for errors and dead links
         run: make docs-check

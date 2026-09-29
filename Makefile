@@ -51,7 +51,7 @@ test:
 
 docs:
 	rm -rf docs/_build/
-	@${ACTIVATE} sphinx-build docs/source docs/_build/
+	@${ACTIVATE} sphinx-build docs/source docs/_build/ 
 
 docs-check:
 	@${ACTIVATE} sphinx-build -E -W -b html docs/source docs/_build/
