@@ -24,7 +24,7 @@ dev:
 
 doc8:
 	@echo "-> Run doc8 validation"
-	@${ACTIVATE} doc8 --quiet docs/ *.rst
+	@${ACTIVATE} doc8 --max-line-length 100 --ignore-path docs/_build/ --quiet docs/
 
 valid:
 	@echo "-> Run Ruff format"
