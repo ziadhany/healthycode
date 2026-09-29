@@ -29,8 +29,11 @@ jobs:
           echo "PATH=$HOME/.poetry/bin:$PATH" >> $GITHUB_ENV
 
       - name: Install Dependencies
-        run:  poetry install --with docs
-
+        run: |
+          ./configure --dev
+          . venv/bin/activate
+          poetry install --with docs
+          
       - name: Check documentation and HTML for errors and dead links
         run: make docs-check
 
