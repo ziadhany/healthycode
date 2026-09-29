@@ -131,7 +131,6 @@ install_packages() {
 
     "$CFG_BIN_DIR/pip" install \
         --upgrade \
-        --no-build-isolation \
         $CFG_QUIET \
         $PIP_EXTRA_ARGS \
         $1

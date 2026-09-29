@@ -11,7 +11,8 @@ A brand new project
     # Create the new repo on GitHub, then update your remote
     git remote set-url origin git@github.com:nexB/your-new-repo.git
 
-From here, you can make the appropriate changes to the files for your specific project.
+From here, you can make the appropriate changes to
+the files for your specific project.
 
 Update an existing project
 ---------------------------
@@ -22,7 +23,8 @@ Update an existing project
     git fetch skeleton
     git merge skeleton/main --allow-unrelated-histories
 
-This is also the workflow to use when updating the skeleton files in any given repository.
+This is also the workflow to use when updating
+the skeleton files in any given repository.
 
 Customizing
 -----------
@@ -58,8 +60,8 @@ dependencies from PyPI and add them to the virtual environment.
 Generating requirements.txt and requirements-dev.txt
 ----------------------------------------------------
 
-After the project has been initialized, we can generate the requirements.txt and
-requirements-dev.txt files.
+After the project has been initialized, we can generate
+the requirements.txt and requirements-dev.txt files.
 
 Ensure the virtual environment is enabled.
 
@@ -71,9 +73,11 @@ To generate requirements.txt:
 
 .. code-block:: bash
 
-    python etc/scripts/gen_requirements.py -s venv/lib/python<version>/site-packages/
+    python etc/scripts/gen_requirements.py
+    -s venv/lib/python<version>/site-packages/
 
-Replace \<version\> with the version number of the Python being used, for example:
+Replace \<version\> with the version number of
+the Python being used, for example:
 ``venv/lib/python3.6/site-packages/``
 
 To generate requirements-dev.txt after requirements.txt has been generated:
@@ -81,28 +85,34 @@ To generate requirements-dev.txt after requirements.txt has been generated:
 .. code-block:: bash
 
     ./configure --dev
-    python etc/scripts/gen_requirements_dev.py -s venv/lib/python<version>/site-packages/
+    python etc/scripts/gen_requirements_dev.py
+    -s venv/lib/python<version>/site-packages/
 
-Note: on Windows, the ``site-packages`` directory is located at ``venv\Lib\site-packages\``
+Note: on Windows, the ``site-packages``
+directory is located at ``venv\Lib\site-packages\``
 
 .. code-block:: bash
 
-    python .\\etc\\scripts\\gen_requirements.py -s .\\venv\\Lib\\site-packages\\
+    python .\\etc\\scripts\\gen_requirements.py
+    -s .\\venv\\Lib\\site-packages\\
     .\configure --dev
-    python .\\etc\\scripts\\gen_requirements_dev.py -s .\\venv\\Lib\\site-packages\\
+    python .\\etc\\scripts\\gen_requirements_dev.py
+    -s .\\venv\\Lib\\site-packages\\
 
 
 Collecting and generating ABOUT files for dependencies
 ------------------------------------------------------
 
-Ensure that the dependencies used by ``etc/scripts/fetch_thirdparty.py`` are installed:
+Ensure that the dependencies
+used by ``etc/scripts/fetch_thirdparty.py`` are installed:
 
 .. code-block:: bash
 
     pip install -r etc/scripts/requirements.txt
 
-Once we have requirements.txt and requirements-dev.txt, we can fetch the project
-dependencies as wheels and generate ABOUT files for them:
+Once we have requirements.txt and requirements-dev.txt,
+we can fetch the project dependencies as wheels
+and generate ABOUT files for them:
 
 .. code-block:: bash
 
@@ -126,17 +136,20 @@ Usage after project initialization
 
 Once the ``requirements.txt`` and ``requirements-dev.txt`` have been generated
 and the project dependencies and their ABOUT files have been uploaded to
-thirdparty.aboutcode.org/pypi, you can configure the project as needed, typically
+thirdparty.aboutcode.org/pypi, you can configure
+the project as needed, typically
 when you update dependencies or use a new checkout.
 
-If the virtual env for the project becomes polluted, or you would like to remove
+If the virtual env for the project becomes polluted,
+or you would like to remove
 it, use the ``--clean`` option:
 
 .. code-block:: bash
 
     ./configure --clean
 
-Then you can run ``./configure`` again to set up the project virtual environment.
+Then you can run ``./configure`` again to set up the project
+virtual environment.
 
 To set up the project for development use:
 
@@ -154,7 +167,9 @@ update the dependencies in ``setup.cfg``, then run:
     python etc/scripts/gen_requirements.py -s venv/lib/python<version>/site-packages/ # Regenerate requirements.txt
     python etc/scripts/gen_requirements_dev.py -s venv/lib/python<version>/site-packages/ # Regenerate requirements-dev.txt
     pip install -r etc/scripts/requirements.txt # Install dependencies needed by etc/scripts/bootstrap.py
-    python etc/scripts/fetch_thirdparty.py -r requirements.txt -r requirements-dev.txt # Collect dependency wheels and their ABOUT files
+    python etc/scripts/fetch_thirdparty.py
+    -r requirements.txt -r requirements-dev.txt # Collect dependency wheels and their ABOUT files
 
-Ensure that the generated ABOUT files are valid, then take the dependency wheels
+Ensure that the generated ABOUT files are valid,
+then take the dependency wheels
 and ABOUT files and upload them to thirdparty.aboutcode.org/pypi.

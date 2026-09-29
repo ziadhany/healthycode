@@ -21,7 +21,8 @@ To get started, check out and configure the repository for development::
 
     In case of windows, run ``configure --dev``.
 
-This will install and configure all requirements foer development including for docs development.
+This will install and configure all requirements
+for development including for docs development.
 
 Now you can build the HTML documentation locally::
 
@@ -45,8 +46,10 @@ To validate the documentation style and content, use::
 Continuous Integration
 ----------------------
 
-The documentations are checked on every new commit, so that common errors are avoided and
-documentation standards are enforced. We checks for these aspects of the documentation:
+The documentations are checked on every new commit,
+so that common errors are avoided and
+documentation standards are enforced.
+We checks for these aspects of the documentation:
 
 1. Successful Builds (By using ``sphinx-build``)
 2. No Broken Links   (By Using ``linkcheck``)
@@ -90,7 +93,8 @@ A sample output is::
         - CheckTrailingWhitespace = 47
         - CheckValidity = 1
 
-Now fix the errors and run again till there isn't any style error in the documentation.
+Now fix the errors and run again till there isn't
+any style error in the documentation.
 
 
 What is Checked?
@@ -123,7 +127,8 @@ Interspinx
 
 AboutCode documentation uses
 `Intersphinx <https://www.sphinx-doc.org/en/master/usage/extensions/intersphinx.html>`_
-to link to other Sphinx Documentations, to maintain links to other Aboutcode Projects.
+to link to other Sphinx Documentations,
+to maintain links to other Aboutcode Projects.
 
 To link sections in the same documentation, standart reST labels are used. Refer
 `Cross-Referencing <https://www.sphinx-doc.org/en/master/usage/restructuredtext/roles.html>`_
@@ -140,10 +145,13 @@ For example::
 
     It refers to the section itself, see :ref:`my-reference-label`.
 
-Now, using Intersphinx, you can create these labels in one Sphinx Documentation and then referance
-these labels from another Sphinx Documentation, hosted in different locations.
+Now, using Intersphinx, you can create these labels in
+one Sphinx Documentation and then referance
+these labels from another Sphinx Documentation,
+hosted in different locations.
 
-You just have to add the following in the ``conf.py`` file for your Sphinx Documentation, where you
+You just have to add the following in the ``conf.py`` file
+for your Sphinx Documentation, where you
 want to add the links::
 
     extensions = [
@@ -161,18 +169,24 @@ To show all Intersphinx links and their targets of an Intersphinx mapping file, 
     ``python -msphinx.ext.intersphinx https://aboutcode.readthedocs.io/objects.inv`` will give
     error.
 
-This enables you to create links to the ``aboutcode`` Documentation in your own Documentation,
-where you modified the configuration file. Links can be added like this::
+This enables you to create links to the ``aboutcode``
+Documentation in your own Documentation,
+where you modified the configuration file.
+Links can be added like this::
 
     For more details refer :ref:`aboutcode:doc_style_guide`.
 
-You can also not use the ``aboutcode`` label assigned to all links from aboutcode.readthedocs.io,
-if you don't have a label having the same name in your Sphinx Documentation. Example::
+You can also not use the ``aboutcode`` label assigned
+to all links from aboutcode.readthedocs.io,
+if you don't have a label having the same name in your
+Sphinx Documentation. Example::
 
     For more details refer :ref:`doc_style_guide`.
 
-If you have a label in your documentation which is also present in the documentation linked by
-Intersphinx, and you link to that label, it will create a link to the local label.
+If you have a label in your documentation
+which is also present in the documentation linked by
+Intersphinx, and you link to that label,
+it will create a link to the local label.
 
 For more information, refer this tutorial named
 `Using Intersphinx <https://my-favorite-documentation-test.readthedocs.io/en/latest/using_intersphinx.html>`_.
@@ -186,8 +200,10 @@ Style Conventions for the Documentaion
 1. Headings
 
     (`Refer <https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html#sections>`_)
-    Normally, there are no heading levels assigned to certain characters as the structure is
-    determined from the succession of headings. However, this convention is used in Python’s Style
+    Normally, there are no heading levels assigned to
+    certain characters as the structure is
+    determined from the succession of headings.
+    However, this convention is used in Python’s Style
     Guide for documenting which you may follow:
 
     # with overline, for parts
@@ -204,7 +220,8 @@ Style Conventions for the Documentaion
 
 2. Heading Underlines
 
-    Do not use underlines that are longer/shorter than the title headline itself. As in:
+    Do not use underlines that are longer/shorter than
+    the title headline itself. As in:
 
     ::
 
@@ -220,42 +237,57 @@ Style Conventions for the Documentaion
 
 .. note::
 
-    Underlines shorter than the Title text generates Errors on sphinx-build.
+    Underlines shorter than the Title text generates Errors
+    on sphinx-build.
 
 
 3. Internal Links
 
-    Using ``:ref:`` is advised over standard reStructuredText links to sections (like
-    ```Section title`_``) because it works across files, when section headings are changed, will
-    raise warnings if incorrect, and works for all builders that support cross-references.
-    However, external links are created by using the standard ```Section title`_`` method.
+    Using ``:ref:`` is advised over standard reStructuredText
+    links to sections (like ```Section title`_``) because it works
+    across files, when section headings are changed, will raise
+    warnings if incorrect, and works for all builders that support
+    cross-references. However, external links are created by
+    using the standard ```Section title`_`` method.
 
 4. Eliminate Redundancy
 
-    If a section/file has to be repeated somewhere else, do not write the exact same section/file
-    twice. Use ``.. include: ../README.rst`` instead. Here, ``../`` refers to the documentation
-    root, so file location can be used accordingly. This enables us to link documents from other
+    If a section/file has to be repeated somewhere else,
+    do not write the exact same section/file twice.
+    Use ``.. include: ../README.rst`` instead. Here, ``../``
+    refers to the documentation root, so file location can
+    be used accordingly. This enables us to link documents from other
     upstream folders.
 
 5. Using ``:ref:`` only when necessary
 
-    Use ``:ref:`` to create internal links only when needed, i.e. it is referenced somewhere.
-    Do not create references for all the sections and then only reference some of them, because
-    this created unnecessary references. This also generates ERROR in ``restructuredtext-lint``.
+    Use ``:ref:`` to create internal links only when needed,
+    i.e. it is referenced somewhere.
+    Do not create references for all the
+    sections and then only reference some of them, because
+    this created unnecessary references.
+    This also generates ERROR in ``restructuredtext-lint``.
 
 6. Spelling
 
-    You should check for spelling errors before you push changes. `Aspell <http://aspell.net/>`_
-    is a GNU project Command Line tool you can use for this purpose. Download and install Aspell,
-    then execute ``aspell check <file-name>`` for all the files changed. Be careful about not
-    changing commands or other stuff as Aspell gives prompts for a lot of them. Also delete the
-    temporary ``.bak`` files generated. Refer the `manual <http://aspell.net/man-html/>`_ for more
+    You should check for spelling errors before
+    you push changes. `Aspell <http://aspell.net/>`_
+    is a GNU project Command Line tool you can use
+    for this purpose. Download and install Aspell,
+    then execute ``aspell check <file-name>`` for all
+    the files changed. Be careful about not
+    changing commands or other stuff as Aspell
+    gives prompts for a lot of them. Also delete the
+    temporary ``.bak`` files generated. Refer the
+    `manual <http://aspell.net/man-html/>`_ for more
     information on how to use.
 
 7. Notes and Warning Snippets
 
-    Every ``Note`` and ``Warning`` sections are to be kept in ``rst_snippets/note_snippets/`` and
-    ``rst_snippets/warning_snippets/`` and then included to eliminate redundancy, as these are
+    Every ``Note`` and ``Warning`` sections are
+    to be kept in ``rst_snippets/note_snippets/`` and
+    ``rst_snippets/warning_snippets/`` and then
+    included to eliminate redundancy, as these are
     frequently used in multiple files.
 
 
@@ -264,8 +296,9 @@ Converting from Markdown
 
 If you want to convert a ``.md`` file to a ``.rst`` file, this
 `tool <https://github.com/chrissimpkins/md2rst>`_ does it pretty well.
-You will still have to clean up and check for errors as this contains a lot of bugs. But this is
+You will still have to clean up and check for errors
+as this contains a lot of bugs. But this is
 definitely better than converting everything by yourself.
-
-This will be helpful in converting GitHub wiki's (Markdown Files) to reStructuredtext files for
+This will be helpful in converting GitHub wiki's
+(Markdown Files) to reStructuredtext files for
 Sphinx/ReadTheDocs hosting.
