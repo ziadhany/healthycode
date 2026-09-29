@@ -15,6 +15,9 @@ help:
 
 .PHONY: help Makefile
 
+docs-check:
+	@${ACTIVATE} sphinx-build -E -W -b html docs/source docs/_build/
+
 # Run the development server using sphinx-autobuild
 docs:
 	@echo
