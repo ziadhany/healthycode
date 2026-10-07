@@ -35,13 +35,9 @@ OPENSEARCH_INDEX = "events"
 FROM_DATE = datetime.datetime(2000, 1, 1)
 
 ERROR_GRIMOIRELAB_URL = "http://localhost:8001"
-REPOSITORIES_URL = (
-    f"{GRIMOIRELAB_URL}/api/v1/ecosystems/{GRIMOIRELAB_ECOSYSTEM}"
-    f"/projects/{GRIMOIRELAB_PROJECT}/repos/"
-)
+REPOSITORIES_URL = f"{GRIMOIRELAB_URL}/api/v1/ecosystems/{GRIMOIRELAB_ECOSYSTEM}" f"/projects/{GRIMOIRELAB_PROJECT}/repos/"
 ERROR_REPOSITORIES_URL = (
-    f"{ERROR_GRIMOIRELAB_URL}/api/v1/ecosystems/{GRIMOIRELAB_ECOSYSTEM}"
-    f"/projects/{GRIMOIRELAB_PROJECT}/repos/"
+    f"{ERROR_GRIMOIRELAB_URL}/api/v1/ecosystems/{GRIMOIRELAB_ECOSYSTEM}" f"/projects/{GRIMOIRELAB_PROJECT}/repos/"
 )
 
 
@@ -132,7 +128,10 @@ class TestMetrics(EndToEndTestCase):
                 )
 
                 package = metrics["packages"]["package0"]
-                self.assertEqual(package["repository"], "https://github.com/angular/quickstart.git", )
+                self.assertEqual(
+                    package["repository"],
+                    "https://github.com/angular/quickstart.git",
+                )
                 package_metrics = package["metrics"]
                 self.assertEqual(package_metrics["active_branches"], 0)
                 self.assertEqual(package_metrics["casual_regular_contributors_rate"], 0.0)
@@ -171,9 +170,7 @@ class TestMetrics(EndToEndTestCase):
                 self.assertIsNone(package_metadata["first_commit_date"])
                 self.assertIsNone(package_metadata["last_commit"])
                 self.assertIsNone(package_metadata["last_commit_date"])
-                self.assertEqual(package["score"]["metadata"],
-                {"ecosystem": "npm", "model": "health", "version": "0.2"}
-                )
+                self.assertEqual(package["score"]["metadata"], {"ecosystem": "npm", "model": "health", "version": "0.2"})
                 self.assertEqual(package["score"]["value"], 1.0)
 
 

@@ -189,9 +189,7 @@ class EndToEndTestCase(TestCase):
         # Keep the security plugin disabled so the server is reachable
         # through plain HTTP without authentication.
         cls.opensearch_container = (
-            OpenSearchContainer(image=OPENSEARCH_IMAGE)
-            .with_exposed_ports(9200)
-            .with_env("DISABLE_SECURITY_PLUGIN", "true")
+            OpenSearchContainer(image=OPENSEARCH_IMAGE).with_exposed_ports(9200).with_env("DISABLE_SECURITY_PLUGIN", "true")
         )
         cls.opensearch_container.start()
         wait_for_logs(cls.opensearch_container, ".*recovered .* indices into cluster_state.*")
@@ -269,15 +267,11 @@ class EndToEndTestCase(TestCase):
             text=True,
         )
         if proc.returncode != 0:
-            raise RuntimeError(
-                f"Error running 'grimoirelab admin create-user'. stdout: {proc.stdout}. stderr: {proc.stderr}"
-            )
+            raise RuntimeError(f"Error running 'grimoirelab admin create-user'. stdout: {proc.stdout}. stderr: {proc.stderr}")
 
         cls._promote_admin_superuser()
 
-        cls.grimoirelab_server = cls._start_grimoirelab_process(
-            "server", ["grimoirelab", "run", "server", "--dev"]
-        )
+        cls.grimoirelab_server = cls._start_grimoirelab_process("server", ["grimoirelab", "run", "server", "--dev"])
         cls._wait_for_grimoirelab_server()
 
         cls.grimoirelab_eventizers = cls._start_grimoirelab_process(
@@ -288,9 +282,7 @@ class EndToEndTestCase(TestCase):
         )
         # docker-compose also runs the ushers, which dispatch the
         # scheduled tasks; run them too.
-        cls.grimoirelab_ushers = cls._start_grimoirelab_process(
-            "ushers", ["grimoirelab", "run", "ushers"]
-        )
+        cls.grimoirelab_ushers = cls._start_grimoirelab_process("ushers", ["grimoirelab", "run", "ushers"])
 
         # Fail fast (with logs) if any worker crashes on startup, instead
         # of failing later with an obscure timeout.
@@ -300,8 +292,7 @@ class EndToEndTestCase(TestCase):
         time.sleep(3)
         if cls.grimoirelab_ushers.poll() is not None:
             logging.warning(
-                "'grimoirelab run ushers' exited unexpectedly; continuing without it.\n"
-                + cls._dump_grimoirelab_logs()
+                "'grimoirelab run ushers' exited unexpectedly; continuing without it.\n" + cls._dump_grimoirelab_logs()
             )
 
     @staticmethod
@@ -319,9 +310,7 @@ class EndToEndTestCase(TestCase):
         )
         proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
         if proc.returncode != 0:
-            raise RuntimeError(
-                f"Error promoting '{GRIMOIRELAB_USER}' to superuser. stdout: {proc.stdout}. stderr: {proc.stderr}"
-            )
+            raise RuntimeError(f"Error promoting '{GRIMOIRELAB_USER}' to superuser. stdout: {proc.stdout}. stderr: {proc.stderr}")
 
     @classmethod
     def _wait_for_grimoirelab_server(cls, timeout=GRIMOIRELAB_SERVER_TIMEOUT):
@@ -342,9 +331,7 @@ class EndToEndTestCase(TestCase):
             except Exception:
                 time.sleep(1)
 
-        raise RuntimeError(
-            f"GrimoireLab server was not ready after {timeout} seconds.\n" + cls._dump_grimoirelab_logs()
-        )
+        raise RuntimeError(f"GrimoireLab server was not ready after {timeout} seconds.\n" + cls._dump_grimoirelab_logs())
 
     @classmethod
     def _confirm_server_is_ours(cls):
@@ -376,9 +363,7 @@ class EndToEndTestCase(TestCase):
 
         while time.time() - start < timeout:
             if proc.poll() is not None:
-                raise RuntimeError(
-                    f"GrimoireLab '{name}' process exited unexpectedly.\n" + cls._dump_grimoirelab_logs()
-                )
+                raise RuntimeError(f"GrimoireLab '{name}' process exited unexpectedly.\n" + cls._dump_grimoirelab_logs())
             try:
                 with open(log_path, errors="replace") as f:
                     if "*** Listening on" in f.read():
@@ -430,16 +415,13 @@ class EndToEndTestCase(TestCase):
                 timeout=30,
             )
         except requests.RequestException as exc:
-            raise RuntimeError(
-                f"Error connecting to the GrimoireLab server: {exc!r}\n\n" + cls._server_diagnostics()
-            )
+            raise RuntimeError(f"Error connecting to the GrimoireLab server: {exc!r}\n\n" + cls._server_diagnostics())
 
         if response.status_code != 200:
             raise RuntimeError(
                 "Error getting the API token. "
                 f"Status: {response.status_code}. "
-                f"Detail: {cls._html_error_detail(response.text)}\n\n"
-                + cls._server_diagnostics()
+                f"Detail: {cls._html_error_detail(response.text)}\n\n" + cls._server_diagnostics()
             )
 
         data = response.json()
@@ -504,16 +486,14 @@ class EndToEndTestCase(TestCase):
         if response.status_code != 404:
             raise RuntimeError(
                 f"Error checking the {kind}. Status: {response.status_code}. "
-                f"Detail: {cls._html_error_detail(response.text)}\n\n"
-                + cls._server_diagnostics()
+                f"Detail: {cls._html_error_detail(response.text)}\n\n" + cls._server_diagnostics()
             )
 
         response = requests.post(post_url, headers=headers, json=body, timeout=30)
         if response.status_code not in (200, 201):
             raise RuntimeError(
                 f"Error creating the {kind}. Status: {response.status_code}. "
-                f"Detail: {cls._html_error_detail(response.text)}\n\n"
-                + cls._server_diagnostics()
+                f"Detail: {cls._html_error_detail(response.text)}\n\n" + cls._server_diagnostics()
             )
 
     @classmethod
@@ -523,16 +503,26 @@ class EndToEndTestCase(TestCase):
             grimoirelab_metrics,
             [
                 ARCHIVED_REPOS_FILE,
-                "--grimoirelab-url", GRIMOIRELAB_URL,
-                "--grimoirelab-user", GRIMOIRELAB_USER,
-                "--grimoirelab-password", GRIMOIRELAB_PASSWORD,
-                "--grimoirelab-ecosystem", GRIMOIRELAB_ECOSYSTEM,
-                "--grimoirelab-project", GRIMOIRELAB_PROJECT,
-                "--opensearch-url", cls.opensearch_url,
-                "--opensearch-user", cls.opensearch_user,
-                "--opensearch-password", cls.opensearch_password,
-                "--opensearch-index", OPENSEARCH_INDEX,
-                "--output", cls.temp_file.name,
+                "--grimoirelab-url",
+                GRIMOIRELAB_URL,
+                "--grimoirelab-user",
+                GRIMOIRELAB_USER,
+                "--grimoirelab-password",
+                GRIMOIRELAB_PASSWORD,
+                "--grimoirelab-ecosystem",
+                GRIMOIRELAB_ECOSYSTEM,
+                "--grimoirelab-project",
+                GRIMOIRELAB_PROJECT,
+                "--opensearch-url",
+                cls.opensearch_url,
+                "--opensearch-user",
+                cls.opensearch_user,
+                "--opensearch-password",
+                cls.opensearch_password,
+                "--opensearch-index",
+                OPENSEARCH_INDEX,
+                "--output",
+                cls.temp_file.name,
                 "--from-date=2000-01-01",
             ],
         )
