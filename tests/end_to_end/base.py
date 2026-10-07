@@ -17,9 +17,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import html
 import logging
 import os
+import re
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -39,22 +42,40 @@ from testcontainers.core.waiting_utils import wait_for_logs
 from grimoirelab_metrics.cli import grimoirelab_metrics
 
 GRIMOIRELAB_URL = "http://localhost:8000"
+GRIMOIRELAB_PORT = 8000
 GRIMOIRELAB_USER = "admin"
 GRIMOIRELAB_PASSWORD = "admin"
 GRIMOIRELAB_ECOSYSTEM = "npm-training-set"
 GRIMOIRELAB_PROJECT = "npm-popular-components"
 
-# The default OpenSearch image used by testcontainers (1.3.x) is too old
-# for GrimoireLab: it rejects the 'copy_alias' field of the ISM rollover
-# action, which makes the archivists crash on startup. A recent image is
-# required (docker-compose uses 'opensearchproject/opensearch:3').
-OPENSEARCH_IMAGE = "opensearchproject/opensearch:2.19.2"
+OPENSEARCH_IMAGE = "opensearchproject/opensearch:3"
 OPENSEARCH_USER = "admin"
 OPENSEARCH_PASSWORD = "admin"
 OPENSEARCH_INDEX = "events"
 
 GRIMOIRELAB_SERVER_TIMEOUT = 120
 GRIMOIRELAB_WORKERS_TIMEOUT = 120
+
+TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+ARCHIVED_REPOS_FILE = os.path.join(TESTS_DIR, "data", "archived_repos.spdx.xml")
+
+PORT_IN_USE_HELP = (
+    "Port 8000, where the tests run the GrimoireLab server, is already in use.\n"
+    "Most likely there are processes or containers left over from a previous "
+    "run (they can survive when a run is interrupted). Clean them up with:\n"
+    "\n"
+    '  pkill -f "grimoirelab run"\n'
+    '  docker ps --filter "label=org.testcontainers=true" -q | xargs -r docker rm -f\n'
+    "\n"
+    "Also stop the docker-compose stack if it is running, as its nginx "
+    "container publishes port 8000 too:\n"
+    "\n"
+    "  docker compose down\n"
+    "\n"
+    "Verify the port is free afterwards with:\n"
+    "\n"
+    "  ss -ltnp | grep :8000"
+)
 
 
 class EndToEndTestCase(TestCase):
@@ -82,6 +103,7 @@ class EndToEndTestCase(TestCase):
         cls._grimoirelab_logs = {}
 
         try:
+            cls._check_grimoirelab_port_is_free()
             cls._start_redis_container()
             cls._start_database_container()
             cls._start_opensearch_container()
@@ -89,20 +111,13 @@ class EndToEndTestCase(TestCase):
             cls._create_grimoirelab_resources()
             cls._preload_repositories()
         except Exception:
-            # unittest does not call tearDownClass when setUpClass fails,
-            # so clean up here to avoid leaking containers and processes.
             cls._cleanup()
             raise
 
     @classmethod
     def tearDownClass(cls):
-        # Give the workers some extra time to finish their pending jobs.
         time.sleep(20)
         cls._cleanup()
-
-    ##
-    # Command execution helpers
-    ##
 
     @staticmethod
     def _reset_logging():
@@ -139,9 +154,25 @@ class EndToEndTestCase(TestCase):
 
         return details
 
-    ##
-    # Containers
-    ##
+    @staticmethod
+    def _port_is_free(port):
+        """Check whether nothing is listening on '127.0.0.1:<port>'."""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(1)
+            return sock.connect_ex(("127.0.0.1", port)) != 0
+
+    @classmethod
+    def _check_grimoirelab_port_is_free(cls):
+        """Ensure the port used by the GrimoireLab server is available.
+
+        When an orphaned 'grimoirelab run server' (or the nginx container
+        of the docker-compose stack) is holding the port, the server of
+        the tests dies with a bind error and the requests are answered
+        by that orphan, whose database containers no longer exist. The
+        symptom is 500 errors like "Can't connect to MySQL server".
+        """
+        if not cls._port_is_free(GRIMOIRELAB_PORT):
+            raise RuntimeError(PORT_IN_USE_HELP)
 
     @classmethod
     def _start_database_container(cls):
@@ -156,7 +187,7 @@ class EndToEndTestCase(TestCase):
     @classmethod
     def _start_opensearch_container(cls):
         # Keep the security plugin disabled so the server is reachable
-        # through plain HTTP without authentication, like before.
+        # through plain HTTP without authentication.
         cls.opensearch_container = (
             OpenSearchContainer(image=OPENSEARCH_IMAGE)
             .with_exposed_ports(9200)
@@ -172,18 +203,11 @@ class EndToEndTestCase(TestCase):
         cls.opensearch_user = OPENSEARCH_USER
         cls.opensearch_password = OPENSEARCH_PASSWORD
 
-    ##
-    # GrimoireLab
-    ##
-
     @classmethod
     def _start_grimoirelab_process(cls, name, args):
         """Start a GrimoireLab process, storing its output in a log file."""
         log_file = tempfile.NamedTemporaryFile(delete=False, prefix=f"grimoirelab_{name}_", suffix=".log")
         cls._grimoirelab_logs[name] = log_file
-
-        # Unbuffered output, so logs reach the file while the process
-        # is still running (needed by '_wait_for_worker_logs').
         env = dict(os.environ)
         env["PYTHONUNBUFFERED"] = "1"
 
@@ -308,16 +332,41 @@ class EndToEndTestCase(TestCase):
                 raise RuntimeError("GrimoireLab server exited unexpectedly.\n" + cls._dump_grimoirelab_logs())
             try:
                 urllib.request.urlopen(GRIMOIRELAB_URL, timeout=5)
+                cls._confirm_server_is_ours()
                 return
             except urllib.error.HTTPError:
-                # Any HTTP response means the server is already running.
+                cls._confirm_server_is_ours()
                 return
+            except RuntimeError:
+                raise
             except Exception:
                 time.sleep(1)
 
         raise RuntimeError(
             f"GrimoireLab server was not ready after {timeout} seconds.\n" + cls._dump_grimoirelab_logs()
         )
+
+    @classmethod
+    def _confirm_server_is_ours(cls):
+        """Confirm the server answering the requests is the one the tests started.
+
+        If port 8000 is taken by another process (an orphaned
+        'grimoirelab run server' from a previous run, or the nginx
+        container of the docker-compose stack), the server of the tests
+        dies with a bind error while that other process answers the
+        requests using the ports of containers that no longer exist.
+        """
+        time.sleep(2)
+        if cls.grimoirelab_server.poll() is not None:
+            raise RuntimeError(
+                "The GrimoireLab server process of the tests died right after "
+                "starting, but SOMETHING is still answering on port 8000. "
+                "Another process took the port and is answering the requests "
+                "with the configuration of a previous run.\n\n"
+                + PORT_IN_USE_HELP
+                + "\n\n--- server output ---\n"
+                + cls._dump_grimoirelab_logs()
+            )
 
     @classmethod
     def _wait_for_worker_logs(cls, name, proc, timeout=GRIMOIRELAB_WORKERS_TIMEOUT):
@@ -344,10 +393,6 @@ class EndToEndTestCase(TestCase):
             timeout,
         )
 
-    ##
-    # Ecosystem and project creation
-    ##
-
     @classmethod
     def _create_grimoirelab_resources(cls):
         """Create the ecosystem and the project used by the tests.
@@ -355,8 +400,7 @@ class EndToEndTestCase(TestCase):
         The metrics CLI takes 'grimoirelab-ecosystem' and
         'grimoirelab-project' as parameters and queries their repos
         endpoint, but it does not create them; they must exist
-        beforehand, or every call becomes a 404 on
-        'ecosystems/None/projects/None'.
+        beforehand, or every call becomes a 404.
         """
         api_url = f"{GRIMOIRELAB_URL}/api/v1"
         headers = cls._api_headers(api_url)
@@ -379,14 +423,23 @@ class EndToEndTestCase(TestCase):
     @classmethod
     def _api_headers(cls, api_url):
         """Return the headers to authenticate against the GrimoireLab API."""
-        response = requests.post(
-            f"{GRIMOIRELAB_URL}/token/",
-            json={"username": GRIMOIRELAB_USER, "password": GRIMOIRELAB_PASSWORD},
-            timeout=30,
-        )
+        try:
+            response = requests.post(
+                f"{GRIMOIRELAB_URL}/token/",
+                json={"username": GRIMOIRELAB_USER, "password": GRIMOIRELAB_PASSWORD},
+                timeout=30,
+            )
+        except requests.RequestException as exc:
+            raise RuntimeError(
+                f"Error connecting to the GrimoireLab server: {exc!r}\n\n" + cls._server_diagnostics()
+            )
+
         if response.status_code != 200:
             raise RuntimeError(
-                f"Error getting the API token. Status: {response.status_code}. Body: {response.text}"
+                "Error getting the API token. "
+                f"Status: {response.status_code}. "
+                f"Detail: {cls._html_error_detail(response.text)}\n\n"
+                + cls._server_diagnostics()
             )
 
         data = response.json()
@@ -404,7 +457,45 @@ class EndToEndTestCase(TestCase):
         raise RuntimeError("None of the authentication schemes was accepted by the GrimoireLab API.")
 
     @staticmethod
-    def _api_get_or_create(headers, get_url, post_url, body, kind):
+    def _html_error_detail(body):
+        """Extract the exception message from a Django debug page."""
+        match = re.search(r'<pre class="exception_value">(.*?)</pre>', body, re.DOTALL)
+        if match:
+            return html.unescape(match.group(1)).strip()
+        # Not a Django debug page; return a truncated copy.
+        return body[:500]
+
+    @classmethod
+    def _server_diagnostics(cls):
+        """Diagnostics to append when a request to the server fails."""
+        lines = []
+
+        server = getattr(cls, "grimoirelab_server", None)
+        if server is not None:
+            if server.poll() is None:
+                lines.append("* Server process started by the tests: running.")
+            else:
+                lines.append(
+                    f"* Server process started by the tests: DEAD (exit code {server.returncode}). "
+                    "The requests were answered by ANOTHER process using port 8000."
+                )
+
+        db_port = os.environ.get("GRIMOIRELAB_DB_PORT")
+        if db_port:
+            if cls._port_is_free(int(db_port)):
+                lines.append(
+                    f"* MariaDB container on port {db_port}: NOT reachable. Either the "
+                    "container died, or the requests were answered by an orphaned server "
+                    "configured with the ports of a previous run."
+                )
+            else:
+                lines.append(f"* MariaDB container on port {db_port}: reachable.")
+
+        lines.append(cls._dump_grimoirelab_logs())
+        return "\n".join(lines)
+
+    @classmethod
+    def _api_get_or_create(cls, headers, get_url, post_url, body, kind):
         """Create a resource through the API if it does not exist yet."""
         response = requests.get(get_url, headers=headers, timeout=30)
         if response.status_code == 200:
@@ -412,18 +503,18 @@ class EndToEndTestCase(TestCase):
 
         if response.status_code != 404:
             raise RuntimeError(
-                f"Error checking the {kind}. Status: {response.status_code}. Body: {response.text}"
+                f"Error checking the {kind}. Status: {response.status_code}. "
+                f"Detail: {cls._html_error_detail(response.text)}\n\n"
+                + cls._server_diagnostics()
             )
 
         response = requests.post(post_url, headers=headers, json=body, timeout=30)
         if response.status_code not in (200, 201):
             raise RuntimeError(
-                f"Error creating the {kind}. Status: {response.status_code}. Body: {response.text}"
+                f"Error creating the {kind}. Status: {response.status_code}. "
+                f"Detail: {cls._html_error_detail(response.text)}\n\n"
+                + cls._server_diagnostics()
             )
-
-    ##
-    # Preload
-    ##
 
     @classmethod
     def _preload_repositories(cls):
@@ -431,7 +522,7 @@ class EndToEndTestCase(TestCase):
         result = cls.runner.invoke(
             grimoirelab_metrics,
             [
-                "./data/archived_repos.spdx.xml",
+                ARCHIVED_REPOS_FILE,
                 "--grimoirelab-url", GRIMOIRELAB_URL,
                 "--grimoirelab-user", GRIMOIRELAB_USER,
                 "--grimoirelab-password", GRIMOIRELAB_PASSWORD,
@@ -453,10 +544,6 @@ class EndToEndTestCase(TestCase):
                 + cls._dump_grimoirelab_logs()
             )
         time.sleep(20)
-
-    ##
-    # Teardown
-    ##
 
     @classmethod
     def _cleanup(cls):

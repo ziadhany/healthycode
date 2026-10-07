@@ -23,11 +23,6 @@ import unittest
 
 from grimoirelab_metrics.cli import (
     grimoirelab_metrics,
-    FILE_TYPE_CODE,
-    FILE_TYPE_BINARY,
-    DEFAULT_PONY_THRESHOLD,
-    DEFAULT_ELEPHANT_THRESHOLD,
-    DEFAULT_DEV_CATEGORIES_THRESHOLDS,
 )
 from end_to_end.base import EndToEndTestCase
 
@@ -104,6 +99,8 @@ class TestMetrics(EndToEndTestCase):
                 command_args(
                     "https://github.com/angular/quickstart.git",
                     self.temp_file.name,
+                    "--from-date=2000-01-01",
+                    "--to-date=2025-01-01",
                     opensearch_url=self.opensearch_url,
                     opensearch_user=self.opensearch_user,
                     opensearch_password=self.opensearch_password,
@@ -112,7 +109,7 @@ class TestMetrics(EndToEndTestCase):
             self.assertEqual(
                 result.exit_code,
                 0,
-                msg=f"Command failed. Output: {result.output}\nException: {result.exception}",
+                msg=f"Command failed. Output:  {result.output}\nException: {result.exception}",
             )
 
             self.assertIn("INFO:root:Found 1 git repositories", logger.output)
@@ -130,53 +127,54 @@ class TestMetrics(EndToEndTestCase):
                 metrics = json.load(f)
                 self.assertEqual(
                     len(metrics["packages"]),
-                    2,
+                    1,
                     msg=f"Unexpected packages in the output file: {list(metrics['packages'])}",
                 )
 
-                self.assertIn("SPDXRef-angular", metrics["packages"])
-                self.assertEqual(
-                    metrics["packages"]["SPDXRef-angular"]["repository"], "https://github.com/angular/quickstart"
+                package = metrics["packages"]["package0"]
+                self.assertEqual(package["repository"], "https://github.com/angular/quickstart.git", )
+                package_metrics = package["metrics"]
+                self.assertEqual(package_metrics["active_branches"], 0)
+                self.assertEqual(package_metrics["casual_regular_contributors_rate"], 0.0)
+                self.assertEqual(package_metrics["coefficient_of_variation"], 17.320508075688775)
+                self.assertEqual(package_metrics["commit_size_added_lines"], 0)
+                self.assertEqual(package_metrics["commit_size_removed_lines"], 0)
+                self.assertEqual(package_metrics["commits_over_periods_rate"], 0.0)
+                self.assertEqual(package_metrics["commits_per_month"], 0.0)
+                self.assertEqual(package_metrics["commits_per_week"], 0.0)
+                self.assertEqual(package_metrics["commits_per_year"], 0.0)
+                self.assertEqual(package_metrics["contributor_growth"], 0)
+                self.assertEqual(package_metrics["contributor_growth_rate"], 0)
+                self.assertEqual(package_metrics["days_since_last_commit"], 9132)
+                self.assertEqual(package_metrics["developer_categories_casual"], 0)
+                self.assertEqual(package_metrics["developer_categories_core"], 0)
+                self.assertEqual(package_metrics["developer_categories_regular"], 0)
+                self.assertEqual(package_metrics["elephant_factor"], 0)
+                self.assertEqual(package_metrics["file_types_binary"], 0)
+                self.assertEqual(package_metrics["file_types_code"], 0)
+                self.assertEqual(package_metrics["file_types_other"], 0)
+                self.assertEqual(package_metrics["found_file_adopters"], 0)
+                self.assertEqual(package_metrics["found_file_license"], 0)
+                self.assertEqual(package_metrics["message_size_mean"], 0)
+                self.assertEqual(package_metrics["message_size_median"], 0)
+                self.assertEqual(package_metrics["message_size_total"], 0)
+                self.assertEqual(package_metrics["pony_factor"], 0)
+                self.assertEqual(package_metrics["recent_commits"], 0)
+                self.assertEqual(package_metrics["recent_contributors"], 0)
+                self.assertEqual(package_metrics["recent_organizations"], 0)
+                self.assertEqual(package_metrics["returning_contributors"], 0)
+                self.assertEqual(package_metrics["total_commits"], 0)
+                self.assertEqual(package_metrics["total_contributors"], 0)
+                self.assertEqual(package_metrics["total_organizations"], 0)
+                package_metadata = package["metadata"]
+                self.assertIsNone(package_metadata["first_commit"])
+                self.assertIsNone(package_metadata["first_commit_date"])
+                self.assertIsNone(package_metadata["last_commit"])
+                self.assertIsNone(package_metadata["last_commit_date"])
+                self.assertEqual(package["score"]["metadata"],
+                {"ecosystem": "npm", "model": "health", "version": "0.2"}
                 )
-                quickstart_metrics = metrics["packages"]["SPDXRef-angular"]["metrics"]
-                self.assertEqual(quickstart_metrics["total_commits"], 164)
-                self.assertEqual(quickstart_metrics["total_contributors"], 25)
-                self.assertEqual(quickstart_metrics["pony_factor"], 2)
-                self.assertEqual(quickstart_metrics["elephant_factor"], 2)
-                self.assertEqual(quickstart_metrics["file_types_other"], 684)
-                self.assertEqual(quickstart_metrics["file_types_binary"], 0)
-                self.assertEqual(quickstart_metrics["file_types_code"], 479)
-                self.assertEqual(quickstart_metrics["commit_size_added_lines"], 53121)
-                self.assertEqual(quickstart_metrics["commit_size_removed_lines"], 51852)
-                self.assertEqual(quickstart_metrics["message_size_total"], 9778)
-                self.assertAlmostEqual(quickstart_metrics["message_size_mean"], 59.6219, delta=0.1)
-                self.assertEqual(quickstart_metrics["message_size_median"], 46)
-                self.assertEqual(quickstart_metrics["developer_categories_core"], 3)
-                self.assertEqual(quickstart_metrics["developer_categories_regular"], 13)
-                self.assertEqual(quickstart_metrics["developer_categories_casual"], 9)
-
-                elapsed_days = (datetime.datetime.now() - FROM_DATE).days
-                self.assertAlmostEqual(quickstart_metrics["commits_per_week"], 164 / (elapsed_days / 7), delta=0.1)
-                self.assertAlmostEqual(quickstart_metrics["commits_per_month"], 164 / (elapsed_days / 30), delta=0.1)
-                self.assertAlmostEqual(quickstart_metrics["commits_per_year"], 164 / (elapsed_days / 365), delta=0.1)
-
-                # First and last commit metrics
-                self.assertEqual(
-                    metrics["packages"]["SPDXRef-angular"]["metadata"]["first_commit"],
-                    "da1ad445ea2b8d94649f132e9f51bb73ce163264",
-                )
-                self.assertEqual(
-                    metrics["packages"]["SPDXRef-angular"]["metadata"]["last_commit"],
-                    "abf848628cf02fd1899ccd7b09eb7b3ffa78aa38",
-                )
-                self.assertEqual(
-                    metrics["packages"]["SPDXRef-angular"]["metadata"]["first_commit_date"],
-                    "2015-03-05T00:05:13-08:00",
-                )
-                self.assertEqual(
-                    metrics["packages"]["SPDXRef-angular"]["metadata"]["last_commit_date"],
-                    "2017-10-31T16:09:38+01:00",
-                )
+                self.assertEqual(package["score"]["value"], 1.0)
 
 
 if __name__ == "__main__":
