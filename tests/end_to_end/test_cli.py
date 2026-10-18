@@ -51,12 +51,6 @@ def command_args(
     opensearch_password=None,
     opensearch_index=OPENSEARCH_INDEX,
 ):
-    """Build the invocation exactly like collect_and_store_grimoire_metric().
-
-    The OpenSearch server started by EndToEndTestCase runs on a random
-    port, so its connection parameters cannot be hardcoded: they must
-    be taken from the test case and passed to this function.
-    """
     return [
         source,
         "--grimoirelab-url",
